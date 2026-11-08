@@ -1,0 +1,10 @@
+FROM alpine:3.23
+WORKDIR /app
+RUN addgroup -g 1000 poker && adduser -D -u 1000 -G poker poker && mkdir /data && chown poker:poker /data
+COPY --chown=poker:poker poker-bank /app/poker-bank
+COPY --chown=poker:poker public /app/public
+USER poker
+ENV PORT=8080 DB_PATH=/data/poker.db
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
+CMD ["/app/poker-bank"]

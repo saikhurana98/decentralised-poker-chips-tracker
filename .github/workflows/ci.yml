@@ -1,0 +1,80 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: rustfmt, clippy
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run build
+      - run: npm audit --audit-level=moderate
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo build --locked
+      - run: npm run test:integration
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+  release:
+    name: Publish verified release
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: npm ci && npm run build
+      - run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - name: Package and publish deployment branch
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          mkdir -p /tmp/poker-release/public /tmp/poker-publish
+          cp target/x86_64-unknown-linux-musl/release/poker-bank /tmp/poker-release/
+          cp public/index.html public/style.css public/app.js /tmp/poker-release/public/
+          cp deploy/Dockerfile.runtime /tmp/poker-release/Dockerfile
+          printf '%s\n' "$SOURCE_SHA" > /tmp/poker-release/COMMIT
+          tar -czf /tmp/poker-publish/release.tgz -C /tmp/poker-release .
+          cd /tmp/poker-publish
+          sha256sum release.tgz > SHA256SUMS
+          printf '%s\n' "$SOURCE_SHA" > COMMIT
+          git init -b deploy/linux-amd64
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add release.tgz SHA256SUMS COMMIT
+          git commit -m "Deploy $SOURCE_SHA"
+          git -C "$GITHUB_WORKSPACE" fetch origin main
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse origin/main)" = "$SOURCE_SHA"
+          git -C "$GITHUB_WORKSPACE" fetch /tmp/poker-publish deploy/linux-amd64
+          git -C "$GITHUB_WORKSPACE" push --force origin FETCH_HEAD:refs/heads/deploy/linux-amd64

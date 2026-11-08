@@ -1,0 +1,8 @@
+[Unit]
+Description=Deploy verified Poker Bank release
+Wants=network-online.target
+After=network-online.target docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/poker-bank-deploy
+TimeoutStartSec=300

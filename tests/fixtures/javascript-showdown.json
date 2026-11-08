@@ -1,0 +1,366 @@
+{
+  "revision": 7,
+  "hostId": "p1",
+  "title": "Compatibility game",
+  "currency": "INR",
+  "minorPerChip": 50,
+  "defaultBuyin": 100,
+  "players": [
+    {
+      "id": "p1",
+      "name": "Alice",
+      "status": "active",
+      "seat": 1,
+      "stack": 0
+    },
+    {
+      "id": "p2",
+      "name": "Bob",
+      "status": "active",
+      "seat": 2,
+      "stack": 0
+    },
+    {
+      "id": "p3",
+      "name": "Carol",
+      "status": "active",
+      "seat": 3,
+      "stack": 0
+    }
+  ],
+  "small": 5,
+  "big": 10,
+  "phase": "showdown",
+  "paused": false,
+  "handNo": 1,
+  "dealer": 1,
+  "hand": {
+    "ids": [
+      "p1",
+      "p2",
+      "p3"
+    ],
+    "street": "preflop",
+    "turn": null,
+    "folded": [],
+    "acted": {
+      "p1": 100,
+      "p2": 100,
+      "p3": 100
+    },
+    "bets": {
+      "p1": 100,
+      "p2": 100,
+      "p3": 50
+    },
+    "contributions": {
+      "p1": 100,
+      "p2": 100,
+      "p3": 50
+    },
+    "current": 100,
+    "lastRaise": 90,
+    "awards": [],
+    "sb": "p2",
+    "bb": "p3"
+  },
+  "ledger": [
+    {
+      "id": "4ccaf7fd-6eeb-4b6d-b342-2fe79cb5a1be",
+      "playerId": "p1",
+      "kind": "buyin",
+      "amount": 100,
+      "at": "2026-11-08T14:53:37.681Z"
+    },
+    {
+      "id": "9302d55e-8315-48a3-90d3-4668bd2cecdb",
+      "playerId": "p2",
+      "kind": "buyin",
+      "amount": 100,
+      "at": "2026-11-08T14:53:37.684Z"
+    },
+    {
+      "id": "e1bf7410-69d7-4724-809f-aeb9db92bb8a",
+      "playerId": "p3",
+      "kind": "buyin",
+      "amount": 50,
+      "at": "2026-11-08T14:53:37.684Z"
+    }
+  ],
+  "history": [
+    {
+      "phase": "between",
+      "handNo": 0,
+      "dealer": null,
+      "hand": null,
+      "stacks": [
+        [
+          "p1",
+          100
+        ],
+        [
+          "p2",
+          100
+        ],
+        [
+          "p3",
+          50
+        ]
+      ],
+      "log": [
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Alice: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Bob: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Carol: buyin 50"
+        }
+      ]
+    },
+    {
+      "phase": "playing",
+      "handNo": 1,
+      "dealer": 1,
+      "hand": {
+        "ids": [
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "street": "preflop",
+        "turn": "p1",
+        "folded": [],
+        "acted": {},
+        "bets": {
+          "p1": 0,
+          "p2": 5,
+          "p3": 10
+        },
+        "contributions": {
+          "p1": 0,
+          "p2": 5,
+          "p3": 10
+        },
+        "current": 10,
+        "lastRaise": 10,
+        "awards": [],
+        "sb": "p2",
+        "bb": "p3"
+      },
+      "stacks": [
+        [
+          "p1",
+          100
+        ],
+        [
+          "p2",
+          95
+        ],
+        [
+          "p3",
+          40
+        ]
+      ],
+      "log": [
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Alice: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Bob: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Carol: buyin 50"
+        },
+        {
+          "at": "2026-11-08T14:53:37.685Z",
+          "text": "Hand 1 started · blinds 5/10"
+        }
+      ]
+    },
+    {
+      "phase": "playing",
+      "handNo": 1,
+      "dealer": 1,
+      "hand": {
+        "ids": [
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "street": "preflop",
+        "turn": "p2",
+        "folded": [],
+        "acted": {
+          "p1": 100
+        },
+        "bets": {
+          "p1": 100,
+          "p2": 5,
+          "p3": 10
+        },
+        "contributions": {
+          "p1": 100,
+          "p2": 5,
+          "p3": 10
+        },
+        "current": 100,
+        "lastRaise": 90,
+        "awards": [],
+        "sb": "p2",
+        "bb": "p3"
+      },
+      "stacks": [
+        [
+          "p1",
+          0
+        ],
+        [
+          "p2",
+          95
+        ],
+        [
+          "p3",
+          40
+        ]
+      ],
+      "log": [
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Alice: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Bob: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Carol: buyin 50"
+        },
+        {
+          "at": "2026-11-08T14:53:37.685Z",
+          "text": "Hand 1 started · blinds 5/10"
+        },
+        {
+          "at": "2026-11-08T14:53:37.685Z",
+          "text": "Alice: allin"
+        }
+      ]
+    },
+    {
+      "phase": "playing",
+      "handNo": 1,
+      "dealer": 1,
+      "hand": {
+        "ids": [
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "street": "preflop",
+        "turn": "p3",
+        "folded": [],
+        "acted": {
+          "p1": 100,
+          "p2": 100
+        },
+        "bets": {
+          "p1": 100,
+          "p2": 100,
+          "p3": 10
+        },
+        "contributions": {
+          "p1": 100,
+          "p2": 100,
+          "p3": 10
+        },
+        "current": 100,
+        "lastRaise": 90,
+        "awards": [],
+        "sb": "p2",
+        "bb": "p3"
+      },
+      "stacks": [
+        [
+          "p1",
+          0
+        ],
+        [
+          "p2",
+          0
+        ],
+        [
+          "p3",
+          40
+        ]
+      ],
+      "log": [
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Alice: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Bob: buyin 100"
+        },
+        {
+          "at": "2026-11-08T14:53:37.684Z",
+          "text": "Carol: buyin 50"
+        },
+        {
+          "at": "2026-11-08T14:53:37.685Z",
+          "text": "Hand 1 started · blinds 5/10"
+        },
+        {
+          "at": "2026-11-08T14:53:37.685Z",
+          "text": "Alice: allin"
+        },
+        {
+          "at": "2026-11-08T14:53:37.685Z",
+          "text": "Bob: allin"
+        }
+      ]
+    }
+  ],
+  "log": [
+    {
+      "at": "2026-11-08T14:53:37.684Z",
+      "text": "Alice: buyin 100"
+    },
+    {
+      "at": "2026-11-08T14:53:37.684Z",
+      "text": "Bob: buyin 100"
+    },
+    {
+      "at": "2026-11-08T14:53:37.684Z",
+      "text": "Carol: buyin 50"
+    },
+    {
+      "at": "2026-11-08T14:53:37.685Z",
+      "text": "Hand 1 started · blinds 5/10"
+    },
+    {
+      "at": "2026-11-08T14:53:37.685Z",
+      "text": "Alice: allin"
+    },
+    {
+      "at": "2026-11-08T14:53:37.685Z",
+      "text": "Bob: allin"
+    },
+    {
+      "at": "2026-11-08T14:53:37.685Z",
+      "text": "Carol: allin"
+    },
+    {
+      "at": "2026-11-08T14:53:37.685Z",
+      "text": "Showdown: host confirms winners for each pot"
+    }
+  ]
+}

@@ -4,4 +4,4 @@ Requires=docker.service
 After=docker.service
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/docker exec poker-bank node /app/backup.mjs
+ExecStart=/usr/bin/docker exec poker-bank /app/poker-bank backup

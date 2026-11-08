@@ -1,1 +1,38 @@
-{"name":"poker-bank","version":"2.0.0","private":true,"type":"module","engines":{"node":">=22.13"},"scripts":{"start":"node server.js","test":"node --test"},"dependencies":{"qrcode":"1.5.4","ws":"8.22.1","zod":"^4.6.7"},"devDependencies":{"@eslint/js":"^10.0.1","@types/node":"^26.6.6","@types/ws":"^8.18.2","esbuild":"^0.28.2","eslint":"^10.14.0","prettier":"^3.9.10","typescript":"^6.0.3","typescript-eslint":"^8.72.1"}}
+{
+  "name": "poker-bank",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "cargo run --locked",
+    "test": "cargo test --locked && npm run test:integration",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint web test playwright.config.ts --max-warnings 0",
+    "format": "prettier --write playwright.config.ts web test/*.ts public/style.css public/index.html *.json *.mjs *.yaml .github CONTRIBUTING.md README.md",
+    "format:check": "prettier --check playwright.config.ts web test/*.ts public/style.css public/index.html *.json *.mjs *.yaml .github CONTRIBUTING.md README.md",
+    "build": "npm run typecheck && esbuild web/app.ts --bundle --minify --format=iife --target=es2022 --outfile=public/app.js",
+    "test:integration": "node --test test/server.test.ts",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "ws": "8.22.1"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  }
+}

@@ -1,7 +1,7 @@
 services:
   poker-bank:
     build: .
-    image: poker-bank:2.0.0
+    image: ${POKER_IMAGE:-poker-bank:2.0.0}
     container_name: poker-bank
     restart: unless-stopped
     ports:
@@ -10,6 +10,7 @@ services:
       PUBLIC_ORIGIN: https://poker.makesomething.in
       TRUSTED_PROXIES: 192.168.42.38
       DB_PATH: /data/poker.db
+      RELEASE_SHA: ${RELEASE_SHA:-local}
     volumes:
       - poker-data:/data
     read_only: true

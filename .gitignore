@@ -4,3 +4,11 @@ data/
 *.db-shm
 *.db-wal
 .DS_Store
+target/
+public/app.js
+coverage/
+release/
+*.tgz
+test-results/
+playwright-report/
+attachments/

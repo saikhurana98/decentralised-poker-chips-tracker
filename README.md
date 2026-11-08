@@ -1,91 +1,90 @@
----
-type: Note
----
-
 # Poker Bank
 
-Live at [poker.makesomething.in](https://poker.makesomething.in). A shared cash-game chip tracker for 2–10 people playing with physical cards. No accounts, virtual cards, payment processing, or hand evaluation. The original offline app is preserved in `Poker Bank.html`; its `pokerbank-v1` browser saves are unchanged and are not imported into multiplayer sessions.
+[![CI](https://github.com/saikhurana98/decentralised-poker-chips-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/saikhurana98/decentralised-poker-chips-tracker/actions/workflows/ci.yml)
 
-## Play
+A shared poker-chip tracker for 2–10 people playing with physical cards. Everyone acts from their own phone; the host manages seats, real-world buy-ins, community-card progression, and payouts.
 
-The home screen lists all sessions that have not ended, with table names, room IDs, player counts, and Join buttons. The list updates over WebSockets; table names and keys are public. Ending a session removes it from the list.
+**Play at [poker.makesomething.in](https://poker.makesomething.in).**
 
-1. Create a table with your name, table name, currency, value per chip, and default buy-in. Defaults are INR, ₹1/chip, 1,000 chips, and blinds 5/10.
-2. Open **Invite friends** to share the eight-character key, link, or locally generated QR. Each player joins from their phone. The host approves a seat and records the chips after confirming the real-world buy-in. The host must approve their own seat to play; they can also stay off-table and host.
-3. Deal real cards and start a hand. Blinds post automatically. Each player acts on their own phone: fold, check, call, raise **to** a total, or all-in. After each round, the host confirms the next physical community cards are dealt. All-ins skip further betting once no competing stacks can act; finish dealing real cards before selecting winners.
-4. At showdown, the host selects every winner for **each pot**, including tied winners. Folded players are ineligible. Odd chips go clockwise from the dealer. Uncalled amounts are returned automatically.
-5. Between hands, approve new players, rebuy, cash out, swap seats, change blinds, or start the next hand. The dealer moves clockwise among funded seats. A late join waits for the next hand. There is no automatic timeout, fold, or reconnection takeover. The host can explicitly control a turn with the player's agreement.
-6. Host controls include pause/resume, transfer host, and **Undo game action**. Undo is visible in activity and restores gameplay only, up to 50 actions. Buy-in/cashout entries are permanent; recording cash or changing seats/blinds clears gameplay undo history. Wrong cash entries are corrected by recording an opposite transaction, with agreement at the table.
-7. **End & cash out all** closes the session and records remaining stacks as cashouts. The ledger shows chips and money, final net positions, suggested transfers, and a JSON export. Confirm and make payments outside the app. An ended table cannot resume.
+## Playing
 
-Keep browser site data on the original device: a private random credential in `pokerbank-seats-v2` localStorage reconnects the same seat after reload or server restart. Invite links contain only the table key and never give control of another seat. Switching tables preserves saved seats. Transfer host **before** clearing browser data or changing devices; there is no password or account recovery. Anyone holding a table key may request a seat and see the table after joining; hosts approve participation. Do not use a table key as a secret financial document link.
+1. Create a named table, choose currency, value per chip, and default buy-in. Defaults: INR, ₹1/chip, 1,000 chips, blinds 5/10.
+2. Share the eight-character room ID, invite link, or QR. Active games appear in the public lobby with names and room IDs. The host approves each seat and buy-in, including their own seat if playing.
+3. Deal physical cards. Players fold, check, call, raise to a total, or go all-in on their phones. After betting, the host confirms the next community cards.
+4. At showdown, the host chooses winners for each main/side pot, including ties. The app refunds uncalled bets and divides odd chips clockwise from the dealer.
+5. Between hands, approve late joins, rebuys, cashouts, seat changes, or blinds. Host controls include pause, explicit turn takeover, host transfer, and visible gameplay undo.
+6. End the session to cash out remaining stacks and see net balances and suggested payments. Export the ledger as JSON. Payments happen outside the app.
 
-Amounts use whole chips. A table may hold at most 10,000,000 chips; each transaction is 1–10,000,000. Chip value uses integer currency minor units (₹0.01–₹1,000 per chip; INR/USD/EUR/GBP). Monetary calculations stay within safe integer bounds. This is a no-limit, four-street betting tracker, with cash-game dealer rotation; antes, straddles, missed-blind debt, tournaments, and multiple boards are not supported. A host must determine physical-card winners.
+Keep browser site data to reconnect to your seat. The browser holds a private device credential; sharing a room ID does not give control of another seat. Transfer hosting before clearing the host device's browser data. There is no account recovery. Table names and room IDs are public, and anyone can request a seat.
 
-## Local development
+## Stack
 
-Node 24 LTS is recommended (minimum 22.13 with `node:sqlite`). Plain HTML/CSS/browser JavaScript; no frontend build.
+- **Rust:** authoritative poker rules, typed commands/state, HTTP/WebSockets, SQLite transactions, QR generation, and consistent backups.
+- **TypeScript:** browser interface and integration tests, with strict compiler options, type-aware ESLint, and Zod validation at message boundaries.
+- **SQLite:** persistent tables, hashed seat credentials, permanent cash ledger, accepted command IDs, and revisions. The migration preserves the original SQLite schema and camelCase JSON protocol.
+- **Docker:** non-root, read-only application container with a persistent `/data` volume, health checks, restart policy, and bounded resource/log usage.
+
+`src/` contains Rust code. `web/` contains browser TypeScript and wire schemas. `public/` contains HTML/CSS and generated `app.js`. `test/` contains TypeScript WebSocket integration tests. `deploy/` contains release, backup, and systemd files. `Poker Bank.html` is the preserved offline predecessor; its browser saves are not imported into multiplayer tables.
+
+## Development
+
+Install stable Rust with rustfmt/Clippy and Node 24:
 
 ```sh
 npm ci
-npm test
-npm start
+npm run build
+cargo run --locked
 ```
 
-Open [localhost:8080](http://localhost:8080). Default storage is `data/poker.db`. `PUBLIC_ORIGIN` must exactly match the browser origin; override it and `PORT` for a different address. The previous offline file can still be opened directly. Current components:
-
-- `engine.js`: pure authoritative betting and ledger transitions.
-- `server.js`: HTTP assets and join/create APIs, authenticated WebSockets, SQLite persistence.
-- `public/`: responsive green table and host/player controls.
-- `test/`: Node test runner engine and real WebSocket integration tests.
-- `deploy/`: consistent database backup, systemd units, and public Traefik route.
-
-`npm test` passes 25 tests, including 100 simulated multiway hands, heads-up order, short blinds, minimum raises and cumulative short all-ins, side pots, uncalled refunds, ties/odd chips, undo/cash invariants, host authorization, cross-origin/cross-table rejection, duplicate/stale commands, and restart recovery. Browser QA completed on Chromium at 1440×1100 desktop and 390×844 phone through both localhost and the public HTTPS/WSS origin: create/join/approval, calls/checks/folds, three community-card confirmations, payouts/next hand, reload, QR, ten seats, and escaped malicious player names. No runtime/CSP errors or horizontal overflow. Phone betting controls stay fixed inside the viewport. A live container restart during an all-in showdown recovered the same seat, hand, revision and ledger; payout, end-session cashouts and monetary net settlement then completed. Disposable verification tables were removed. Screenshots are in `attachments/`.
-
-## Persistence and limits
-
-All accepted commands include an ID and expected revision. The server validates rules and authority, commits the new snapshot and deduplication record in one SQLite transaction with WAL and FULL synchronization, then acknowledges/broadcasts. Duplicate IDs return the original accepted revision without executing again. Stale actions are rejected and refreshed; the player reviews and retries. A command awaiting acknowledgement is resent with the same ID after reconnecting. No action succeeds locally while disconnected.
-
-Credentials are 256-bit random tokens; only SHA-256 hashes are stored server-side. Exact-origin checks cover WebSockets and writes. Payload, connection, per-IP and per-player rate limits bound abuse; limits are per process and reset on restart. Trusted forwarded IPs are accepted only from the configured ingress address. Static CSP disallows inline scripts and styles. Player/table names are escaped before HTML insertion. Requests are limited to 8 creations/hour and 25 joins/hour/IP, 30 create/join requests/minute/IP; 500 simultaneous sockets, 10,000 retained tables, 20 pending requests and 40 total participant identities/table. Tables with no connections or activity for 90 days are removed hourly with credentials and deduplication records. A session still open on a connected phone is retained. There is no end-to-end encryption; the home server stores the table ledger.
-
-## Home-server deployment
-
-Production topology (verified 8 November 2026):
-
-```text
-poker.makesomething.in → wildcard DNS CNAME nb.makesomething.in
-→ public 103.59.195.210:443 → CT117 Traefik (192.168.42.38)
-→ CT116 poker-bank container (192.168.42.20:8087 → 8080)
-→ Docker volume poker-bank-data (/data/poker.db)
-```
-
-The public route is **CT117**, not CT103/CT119 Caddy. It uses Traefik's existing `letsencrypt` TLS challenge resolver. The isolated `poker-bank` router/service was merged into `/root/traefik-dynamic.yaml`, retaining the existing TCP configuration. Original: `/root/traefik-dynamic.yaml.poker-20261108-193113`. No DNS change was needed. An initial CT103 route was removed by restoring `/etc/caddy/Caddyfile.poker-20261108-190224`; CT103 is back to its original config.
-
-Source deployment is `/opt/poker-bank` on CT116. `compose.yaml` runs as the non-root `node` user, read-only root filesystem, dropped capabilities, 256 MB RAM/one CPU limit, bounded logs, persistent volume and health check, with `unless-stopped` restart. `TRUSTED_PROXIES=192.168.42.38`. There is no automatic GitHub deployment. Do not commit from the unrelated parent Notes repository.
-
-After copying the project files to CT116 `/opt/poker-bank`:
+Open `http://localhost:8080`. Rebuild browser assets after TypeScript changes. Configure `PUBLIC_ORIGIN` to exactly match the browser address. SQLite defaults to `data/poker.db`; override `DB_PATH` for disposable testing. Run the gates in [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 ```sh
-cd /opt/poker-bank
+npm run format:check
+npm run lint
+npm run build
+cargo fmt --all --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --locked
+npm run test:integration
+npx playwright install chromium
+npm run test:browser
+```
+
+The frontend enables `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and unused-code checks. ESLint uses `strictTypeChecked` with zero warnings allowed. Prettier formats frontend/configuration files; rustfmt formats Rust. The minimatch override tracks the patched version required to avoid a transitive lint-tool vulnerability.
+
+Validation includes 26 Rust regression tests, the multi-client TypeScript integration suite, and a Playwright phone gameplay test. Full desktop/phone QA also covers ten seats, QR invites, reconnects, side-pot payouts, and safe name rendering.
+
+## CI/CD
+
+Pull requests and main pushes run `.github/workflows/ci.yml`: formatting, ESLint, TypeScript/build, dependency audit, rustfmt, Clippy with warnings denied, Rust tests, actual multi-client WebSocket integration/restart tests, and a mobile browser gameplay smoke test. Third-party actions are pinned to commit SHAs. Pull requests have read-only workflow permissions and never publish releases.
+
+After all checks pass on `main`, GitHub builds a static Linux amd64 Rust binary and browser assets, packages a release with SHA256 and its source commit, then publishes it to `deploy/linux-amd64`. Only the release job has repository write permission. The deployment branch retains the newest build rather than accumulating binaries.
+
+The homeserver checks that branch every two minutes using a repository-specific **read-only deploy key**. It verifies the checksum, creates a database backup, builds a minimal runtime container, switches releases, and requires `/healthz` to report the exact source commit. A failed health check restores the previous image. GitHub Actions has no SSH access to the homeserver and stores no server credentials.
+
+The database volume is preserved during upgrades. Current code changes must maintain saved-state and protocol compatibility. Automatic application rollback does not reverse database migrations; any incompatible schema change requires a reviewed migration and recovery plan.
+
+## Hosting and operations
+
+Copy source to a Docker host and configure the LAN bind address, `PUBLIC_ORIGIN`, and `TRUSTED_PROXIES` in `compose.yaml`. Terminate HTTPS at your reverse proxy, forwarding WebSocket upgrades to the application. The production route is managed separately from application releases; `deploy/traefik-poker.yaml` is the isolated route example.
+
+```sh
 docker compose up -d --build
-docker inspect --format '{{.State.Health.Status}}' poker-bank
 docker logs --tail 30 poker-bank
-curl -fsS http://192.168.42.20:8087/healthz
+docker exec poker-bank /app/poker-bank backup
+systemctl status poker-bank-deploy.timer poker-bank-backup.timer
+journalctl -u poker-bank-deploy.service -n 30
 ```
 
-Strict TLS was verified using Node fetch and Chromium; the workstation's old macOS curl trust bundle did not recognize the newly issued Let's Encrypt YR1 chain. Do not disable TLS verification for regular use.
+The backup CLI uses SQLite's online backup API and retains the latest 14 snapshots in `/data/backups` (`BACKUP_DIR` can override it). A daily systemd timer runs it. These copies share the data volume: copy snapshots to separate storage for host/disk-loss protection. Never copy just a live WAL database file.
 
-A daily `poker-bank-backup.timer` runs at 04:20 host time (up to ten minutes randomized delay), including catch-up after downtime. It invokes Node SQLite's backup API inside the running container, retaining the newest 14 consistent backups in `/data/backups/`. A manual backup was tested successfully.
+To restore: take a current backup, stop the application, replace `/data/poker.db` with a selected consistent backup, remove stale `-wal` and `-shm` files, preserve UID/GID 1000 ownership, restart, and verify the recovered table. Never delete the Docker volume during an upgrade. For release rollback, redeploy a previous verified image with the same volume and matching `RELEASE_SHA`.
 
-```sh
-systemctl status poker-bank-backup.timer
-systemctl start poker-bank-backup.service
-journalctl -u poker-bank-backup.service -n 15
-docker exec poker-bank ls -lh /data/backups
-```
+## Rules and limits
 
-Backups are on the same Docker volume: copy them to separate storage for disk/host-loss protection. Never copy only a live database file while WAL is active.
+Whole chips only; at most 10,000,000 chips per table. Supported currencies: INR, USD, EUR, GBP, with integer minor-unit chip values. No-limit cash games, physical cards, four betting streets. No tournaments, antes, straddles, missed-blind debt, multiple boards, or automated card evaluation. Disconnections wait for reconnection or explicit host control; no automatic folds.
 
-To restore, first create a current backup, stop `poker-bank`, and use a temporary container mounting `poker-bank-data` to replace `/data/poker.db` with the selected backup, remove obsolete `/data/poker.db-wal` and `/data/poker.db-shm`, and retain UID/GID 1000 ownership. Start the container and check health and a known table. Do not delete the volume during upgrades.
+Every game command has a unique ID and expected revision. The server validates authorization/rules and commits state plus deduplication atomically before acknowledging/broadcasting. Reconnects retrieve current state and retry unacknowledged commands with the same ID. Cash entries are permanent; undo affects gameplay only. Buy-ins, cashouts, seating, and blind changes clear gameplay undo history.
 
-For an app rollback, rebuild/deploy the previous source using the same volume. For route rollback, restore CT117's recorded original dynamic file **in place** (single-file bind mount) and verify Traefik reload; this removes public access to Poker Bank while leaving other routes untouched. Do not overwrite the backup or publish proxy configs containing provider credentials.
+Exact-origin checks, payload/connection/rate limits, hashed random credentials, CSP, and escaped names protect public access. Sessions without activity or connections expire after 90 days. There is no end-to-end encryption: the server stores the ledger. Never commit production databases, browser seat tokens, provider credentials, or private keys.
