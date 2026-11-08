@@ -5,7 +5,13 @@ flock -n 9 || exit 0
 ROOT=/opt/poker-bank
 REPO=/var/lib/poker-bank-deploy/repo
 export GIT_SSH_COMMAND='ssh -i /root/.ssh/poker-bank-deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes'
-git -C "$REPO" fetch --quiet origin deploy/linux-amd64
+if git -C "$REPO" ls-remote --exit-code origin refs/heads/deploy/linux-amd64 >/dev/null; then
+  git -C "$REPO" fetch --quiet origin deploy/linux-amd64
+else
+  result=$?
+  if [ "$result" -eq 2 ]; then echo "Waiting for first verified GitHub release"; exit 0; fi
+  exit "$result"
+fi
 sha=$(git -C "$REPO" show FETCH_HEAD:COMMIT)
 case "$sha" in ''|*[!a-f0-9]*) echo 'Invalid source revision' >&2; exit 1;; esac
 [ "${#sha}" -eq 40 ] || exit 1
