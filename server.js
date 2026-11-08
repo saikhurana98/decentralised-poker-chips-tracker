@@ -1,0 +1,53 @@
+import http from 'node:http';
+import { readFileSync, mkdirSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+import { randomBytes, createHash, randomUUID } from 'node:crypto';
+import { WebSocketServer, WebSocket } from 'ws';
+import QRCode from 'qrcode';
+import { fresh, apply, clone, name, requireThat, pots, legal, balances, settlement } from './engine.js';
+const port=Number(process.env.PORT||8080),origin=process.env.PUBLIC_ORIGIN||`http://localhost:${port}`,dbPath=process.env.DB_PATH||'./data/poker.db';
+mkdirSync(dbPath.substring(0,dbPath.lastIndexOf('/'))||'.',{recursive:true});
+const db=new DatabaseSync(dbPath);db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS tables (code TEXT PRIMARY KEY, state TEXT NOT NULL, updated INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS credentials (hash TEXT PRIMARY KEY, code TEXT NOT NULL REFERENCES tables(code), player TEXT NOT NULL); CREATE TABLE IF NOT EXISTS commands (code TEXT NOT NULL REFERENCES tables(code), player TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, PRIMARY KEY(code,player,id));');
+const clients=new Set(),limits=new Map();
+const trusted=(process.env.TRUSTED_PROXIES||'').split(',');
+function clientIP(req){const peer=req.socket.remoteAddress?.replace(/^::ffff:/,'');return trusted.includes(peer)&&typeof req.headers['x-forwarded-for']==='string'?req.headers['x-forwarded-for'].split(',').at(-1).trim():peer;}
+function limited(ip,key,max,window=60000) {const k=ip+':'+key,now=Date.now(),v=limits.get(k)||{n:0,until:now+window};if(now>v.until){v.n=0;v.until=now+window;}v.n++;limits.set(k,v);return v.n>max;}
+setInterval(()=>{for(const [k,v]of limits)if(Date.now()>v.until)limits.delete(k);},60000).unref();
+const hash=x=>createHash('sha256').update(x).digest('hex');
+const get=code=>{const row=db.prepare('SELECT state FROM tables WHERE code=?').get(code);requireThat(row,'Table not found');return JSON.parse(row.state);};
+const save=(code,s)=>db.prepare('UPDATE tables SET state=?,updated=? WHERE code=?').run(JSON.stringify(s),Date.now(),code);
+function transaction(fn){db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r;}catch(e){db.exec('ROLLBACK');throw e;}}
+function authenticate(code,token){requireThat(typeof code==='string'&&/^[A-Z2-9]{8}$/.test(code)&&typeof token==='string'&&token.length===43,'Invalid credentials');const row=db.prepare('SELECT player FROM credentials WHERE hash=? AND code=?').get(hash(token),code);requireThat(row,'Invalid credentials');return row.player;}
+function snapshot(code,viewer){const s=get(code);const p=s.players.find(p=>p.id===viewer);requireThat(p,'Seat no longer available');return {...s,history:undefined,undoCount:s.history.length,code,you:viewer,pots:pots(s),legal:legal(s,viewer),balances:balances(s),settlement:settlement(s),online:[...new Set([...clients].filter(c=>c.code===code&&c.player).map(c=>c.player))]};}
+function send(ws,data){if(ws.readyState===WebSocket.OPEN){if(ws.bufferedAmount>1024*1024)return ws.terminate();ws.send(JSON.stringify(data));}}
+function lobbyState(){return {type:"lobby",tables:db.prepare("SELECT code, state FROM tables WHERE json_extract(state, '$.phase') != 'ended' ORDER BY updated DESC").all().map(row=>{const s=JSON.parse(row.state);return {code:row.code,title:s.title||"Home game",players:s.players.filter(p=>p.status==="active").length,phase:s.paused?"paused":s.phase};})};}
+function broadcastLobby(){const viewers=[...clients].filter(c=>c.lobby);if(!viewers.length)return;const data=lobbyState();for(const c of viewers)send(c,data);}
+function broadcast(code){broadcastLobby();for(const c of clients)if(c.code===code&&c.player){try{send(c,{type:'state',state:snapshot(code,c.player)});}catch{c.close(4003,'Seat removed');}}}
+const assets=new Map([['/',['index.html','text/html; charset=utf-8']],['/app.js',['app.js','text/javascript; charset=utf-8']],['/style.css',['style.css','text/css; charset=utf-8']]].map(([path,[file,type]])=>[path,{body:readFileSync(new URL('./public/'+file,import.meta.url)),type}]));
+const server=http.createServer(async(req,res)=>{
+ const ip=clientIP(req); res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+ const url=new URL(req.url,'http://local');
+ const json=(status,obj)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(obj));};
+ if(req.method==='GET'&&url.pathname==='/healthz'){try{db.prepare('SELECT 1').get();return json(200,{ok:true,version:'2.0.0'});}catch{return json(503,{ok:false});}}
+ if(req.method==='GET'&&url.pathname==='/qr'){const code=url.searchParams.get('code');if(!/^[A-Z2-9]{8}$/.test(code||''))return json(400,{error:'Invalid code'});res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public,max-age=3600'});return res.end(await QRCode.toBuffer(`${origin}/?table=${code}`,{width:220,margin:2}).catch(()=>Buffer.alloc(0)));}
+ if(req.method==='GET'&&assets.has(url.pathname)){const a=assets.get(url.pathname);res.writeHead(200,{'Content-Type':a.type,'Cache-Control':'no-cache'});return res.end(a.body);}
+ if(req.method!=='POST'||!['/api/create','/api/join'].includes(url.pathname))return json(404,{error:'Not found'});
+ if(req.headers.origin!==origin)return json(403,{error:'Origin rejected'});
+ if(limited(ip,'requests',30)||limited(ip,url.pathname,url.pathname.endsWith('create')?8:25,3600000))return json(429,{error:'Too many requests. Please try later.'});
+ let body='';try{for await(const chunk of req){body+=chunk;requireThat(body.length<=2048,'Request too large');}const data=JSON.parse(body);const display=name(data.name);const options={title:name(data.title||'Home game'),currency:String(data.currency||'INR'),minorPerChip:data.minorPerChip??100,defaultBuyin:data.defaultBuyin??1000};requireThat(['INR','USD','EUR','GBP'].includes(options.currency),'Unsupported currency');requireThat(Number.isSafeInteger(options.minorPerChip)&&options.minorPerChip>=1&&options.minorPerChip<=100000,'Chip value must be 0.01–1000');requireThat(Number.isSafeInteger(options.defaultBuyin)&&options.defaultBuyin>0&&options.defaultBuyin<=10000000,'Invalid default buy-in');const token=randomBytes(32).toString('base64url'),id=randomUUID();let code;
+ transaction(()=>{if(url.pathname==='/api/create'){requireThat(db.prepare('SELECT count(*) AS n FROM tables').get().n<10000,'Server table limit reached');do{code=Array.from(randomBytes(8),v=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[v%32]).join('');}while(db.prepare('SELECT code FROM tables WHERE code=?').get(code));db.prepare('INSERT INTO tables VALUES (?,?,?)').run(code,JSON.stringify(fresh(id,display,options)),Date.now());}else{code=String(data.code||'').toUpperCase().trim();const s=get(code);requireThat(s.phase!=='ended','Session has ended');requireThat(s.players.length<40&&s.players.filter(p=>p.status==='pending').length<20,'Join queue is full');s.players.push({id,name:display,status:'pending',seat:null,stack:0});s.revision++;save(code,s);}db.prepare('INSERT INTO credentials VALUES (?,?,?)').run(hash(token),code,id);});json(200,{code,token,playerId:id});broadcast(code);
+ }catch(e){json(400,{error:e.message==='Table not found'?'Table not found':e.message});}
+});
+const wss=new WebSocketServer({noServer:true,maxPayload:8192,perMessageDeflate:false});
+server.on('upgrade',(req,socket,head)=>{if(req.url!=='/ws'||req.headers.origin!==origin||limited(clientIP(req),'ws',60)||clients.size>=500){socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');return socket.destroy();}wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));});
+wss.on('connection',(ws,req)=>{clients.add(ws);ws.alive=true;ws.on('pong',()=>ws.alive=true);const authTimer=setTimeout(()=>{if(!ws.player)ws.close(4001,'Authentication required');},5000);ws.on('error',()=>{});ws.on('close',()=>{clearTimeout(authTimer);clients.delete(ws);if(ws.code)broadcast(ws.code);});
+ ws.on('message',raw=>{let msg;try{if(limited(clientIP(req),'messages',1200)||limited(ws.player||clientIP(req),'playerMessages',180))throw new Error('Rate limit exceeded');msg=JSON.parse(raw);if(msg.type==='lobby'&&!ws.player){ws.lobby=true;clearTimeout(authTimer);send(ws,lobbyState());return;}if(!ws.player){requireThat(msg.type==='auth','Authenticate first');ws.player=authenticate(msg.code,msg.token);ws.code=msg.code;clearTimeout(authTimer);broadcast(ws.code);return;}
+ requireThat(msg.type==='command'&&typeof msg.id==='string'&&/^[\w-]{8,80}$/.test(msg.id),'Invalid command envelope');requireThat(Number.isSafeInteger(msg.revision),'Invalid revision');requireThat(msg.command&&typeof msg.command==='object','Invalid command');let duplicate=false,revision;
+ transaction(()=>{const prior=db.prepare('SELECT revision FROM commands WHERE code=? AND player=? AND id=?').get(ws.code,ws.player,msg.id);if(prior){duplicate=true;revision=prior.revision;return;}const s=get(ws.code);requireThat(s.revision===msg.revision,'State changed. Review the refreshed table and try again.');const next=apply(s,ws.player,msg.command);save(ws.code,next);revision=next.revision;db.prepare('INSERT INTO commands VALUES (?,?,?,?)').run(ws.code,ws.player,msg.id,revision);});send(ws,{type:'ack',id:msg.id,revision,duplicate});broadcast(ws.code);
+ }catch(e){send(ws,{type:'error',id:msg?.id,error:e.message});if(!ws.player){ws.close(4003,'Invalid credentials');return;}if(ws.code&&ws.player){try{send(ws,{type:'state',state:snapshot(ws.code,ws.player)});}catch{ws.close(4003,'Seat removed');}}}});
+});
+const heartbeat=setInterval(()=>{for(const ws of clients){if(!ws.alive){ws.terminate();continue;}ws.alive=false;ws.ping();}},30000);heartbeat.unref();
+function cleanExpired(){const cutoff=Date.now()-90*86400000;const active=new Set([...clients].map(c=>c.code));for(const row of db.prepare('SELECT code FROM tables WHERE updated < ?').all(cutoff)){if(active.has(row.code))continue;transaction(()=>{db.prepare('DELETE FROM commands WHERE code=?').run(row.code);db.prepare('DELETE FROM credentials WHERE code=?').run(row.code);db.prepare('DELETE FROM tables WHERE code=?').run(row.code);});}}
+cleanExpired();setInterval(cleanExpired,3600000).unref();
+server.listen(port,process.env.HOST||'0.0.0.0',()=>console.log(`Poker Bank listening on ${port}`));
+function stop(){for(const ws of clients)ws.close(1001,'Server restarting');server.close(()=>{db.close();process.exit(0);});setTimeout(()=>process.exit(0),5000).unref();}process.on('SIGTERM',stop);process.on('SIGINT',stop);

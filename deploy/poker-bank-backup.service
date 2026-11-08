@@ -1,0 +1,7 @@
+[Unit]
+Description=Consistent Poker Bank SQLite backup
+Requires=docker.service
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec poker-bank node /app/backup.mjs

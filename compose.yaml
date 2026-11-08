@@ -1,0 +1,31 @@
+services:
+  poker-bank:
+    build: .
+    image: poker-bank:2.0.0
+    container_name: poker-bank
+    restart: unless-stopped
+    ports:
+      - "192.168.42.20:8087:8080"
+    environment:
+      PUBLIC_ORIGIN: https://poker.makesomething.in
+      TRUSTED_PROXIES: 192.168.42.38
+      DB_PATH: /data/poker.db
+    volumes:
+      - poker-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16M
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+volumes:
+  poker-data:
+    name: poker-bank-data

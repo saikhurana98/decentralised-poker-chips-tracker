@@ -1,0 +1,15 @@
+# Merge into the existing dynamic file; preserve its existing tcp configuration.
+http:
+  routers:
+    poker-bank:
+      rule: "Host(`poker.makesomething.in`)"
+      entryPoints:
+        - websecure
+      service: poker-bank
+      tls:
+        certResolver: letsencrypt
+  services:
+    poker-bank:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.42.20:8087"
